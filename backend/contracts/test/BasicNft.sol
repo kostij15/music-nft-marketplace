@@ -1,22 +1,35 @@
 // SPDX License-Identifier: MIT
+
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 pragma solidity ^0.8.7;
 
 //we'll be using open zepplin contracts
-contract BasicNFT is ERC721 {
+contract BasicNFT is ERC721, Ownable {
+    using Strings for uint256;
     //_safeMint takes a parameter tokenId, which references each NFT token's unique id
     //we will need to add a private variable that represents tokenId
     uint256 private s_tokenCounter;
 
-    //for our simple contract we're having a uri
-    //The image current has ipfs.io. WE DO NOT WANT THAT GOING FORWARD SINCE IF IT GOES DOWN ITS OVERRRRRRR-> SIMPLY FOR THE EXAMPLE
-    string public constant TOKEN_URI =
-        "ipfs://bafybeig37ioir76s7mg5oobetncojcm3c3hxasyd4rvid4jqhy4gkaheg4/?filename=0-PUG.json";
+    //Mapping for token Ids to token URIs
+    mapping(uint256 => string) private _tokenURIs;
 
-    constructor() ERC721("Music NFT", "Music NFT") {
-        s_tokenCounter = 0;
+    //Base URI
+    string private baseURIextended;
+
+    //modifiers
+    modifier tokenExists(uint256 tokenId) {
+        require(
+            _exists(tokenId),
+            "ERC721Metadata: URI set of nonexistent token"
+        );
+        _;
     }
+
+    constructor(string memory _name, string memory _symbol)
+        ERC721(_name, _symbol)
+    {}
 
     function mintNft() public returns (uint256) {
         _safeMint(msg.sender, s_tokenCounter);
@@ -24,10 +37,42 @@ contract BasicNFT is ERC721 {
         return s_tokenCounter;
     }
 
-    function tokenURI(
-        uint256 /*tokenId*/ //The original contract takes a tokenId however since it is only one for this contract we won't be using it here
-    ) public view override returns (string memory) {
-        return TOKEN_URI;
+    function setBaseURI(string memory _baseURI) external onlyOwner {
+        baseURIextended = _baseURI;
+    }
+
+    function _setTokenURI(uint256 tokenId, string memory _tokenURI)
+        internal
+        virtual
+        tokenExists(tokenId)
+    {
+        require(
+            _exists(tokenId),
+            "ERC721Metadata: URI set of nonexistent token"
+        );
+        _tokenURIs[tokenId] = _tokenURI;
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override
+        tokenExists(tokenId)
+        returns (string memory)
+    {
+        string memory _tokenURI = _tokenURIs[tokenId];
+        string memory base = _baseURI();
+
+        //no base return token URI
+        if (bytes(base).length == 0) {
+            return _tokenURI;
+        }
+        //if both are set, concatenate the two
+        if (bytes(_tokenURI).length > 0) {
+            return string(abi.encodePacked(base, _tokenURI));
+        }
+        //if theres a base URI but no token URI, concatenate both
+        return string(abi.encodePacked(base, tokenId.toString()));
     }
 
     function getTokenCounter() public view returns (uint256) {
